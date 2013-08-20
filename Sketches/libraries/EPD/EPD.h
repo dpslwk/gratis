@@ -18,14 +18,14 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#if defined(__MSP430_CPU__)
+#if defined(__MSP430_CPU__) || defined(_SAM3XA_)
 #define PROGMEM
 #else
 #include <avr/pgmspace.h>
 #endif
 
 // if more SRAM available (8 kBytes)
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(_SAM3XA_)
 #define EPD_ENABLE_EXTRA_SRAM 1
 #endif
 

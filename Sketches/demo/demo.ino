@@ -131,6 +131,21 @@ const int Pin_FLASH_CS = P2_7;
 const int Pin_SW2 = P1_3;
 const int Pin_RED_LED = P1_0;
 
+#elif defined(_SAM3XA_)
+
+// Arduino DUE IO layout
+const int Pin_TEMPERATURE = A0;
+const int Pin_PANEL_ON = 2;
+const int Pin_BORDER = 3;
+const int Pin_DISCHARGE = 9;
+const int Pin_PWM = 5;
+const int Pin_RESET = 6;
+const int Pin_BUSY = 7;
+const int Pin_EPD_CS = 52;
+const int Pin_FLASH_CS = 10;
+const int Pin_SW2 = 12;
+const int Pin_RED_LED = 13;
+
 #else
 
 // Arduino IO layout
@@ -193,7 +208,9 @@ void setup() {
 	Serial.println("Demo version: " DEMO_VERSION);
 	Serial.println("Display: " MAKE_STRING(EPD_SIZE));
 	Serial.println();
-
+    
+// if DUE skip the flash stuff it's not used or fixed 
+#ifndef (_SAM3XA_)
 	FLASH.begin(Pin_FLASH_CS);
 	if (FLASH.available()) {
 		Serial.println("FLASH chip detected OK");
@@ -207,7 +224,8 @@ void setup() {
 		Serial.print(device, HEX);
 		Serial.println();
 	}
-
+#endif
+    
 	// configure temperature sensor
 	S5813A.begin(Pin_TEMPERATURE);
 }

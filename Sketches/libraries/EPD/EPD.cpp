@@ -32,29 +32,35 @@
 static void PWM_start(int pin);
 static void PWM_stop(int pin);
 
+#ifdef _SAM3XA_
+static void SPI_on(uint8_t cs_pin);
+static void SPI_off(uint8_t cs_pin);
+static void SPI_put(uint8_t cs_pin, uint8_t c, uint8_t contin);
+static void SPI_put_wait(uint8_t cs_pin, uint8_t c, int busy_pin, uint8_t contin);
+#else
 static void SPI_on();
 static void SPI_off();
 static void SPI_put(uint8_t c);
 static void SPI_put_wait(uint8_t c, int busy_pin);
+#endif
 static void SPI_send(uint8_t cs_pin, const uint8_t *buffer, uint16_t length);
 
-
 EPD_Class::EPD_Class(EPD_size size,
-		     int panel_on_pin,
-		     int border_pin,
-		     int discharge_pin,
-		     int pwm_pin,
-		     int reset_pin,
-		     int busy_pin,
-		     int chip_select_pin) :
-	EPD_Pin_PANEL_ON(panel_on_pin),
-	EPD_Pin_BORDER(border_pin),
-	EPD_Pin_DISCHARGE(discharge_pin),
-	EPD_Pin_PWM(pwm_pin),
-	EPD_Pin_RESET(reset_pin),
-	EPD_Pin_BUSY(busy_pin),
-	EPD_Pin_EPD_CS(chip_select_pin) {
-
+                     int panel_on_pin,
+                     int border_pin,
+                     int discharge_pin,
+                     int pwm_pin,
+                     int reset_pin,
+                     int busy_pin,
+                     int chip_select_pin) :
+EPD_Pin_PANEL_ON(panel_on_pin),
+EPD_Pin_BORDER(border_pin),
+EPD_Pin_DISCHARGE(discharge_pin),
+EPD_Pin_PWM(pwm_pin),
+EPD_Pin_RESET(reset_pin),
+EPD_Pin_BUSY(busy_pin),
+EPD_Pin_EPD_CS(chip_select_pin) {
+    
 	this->size = size;
 	this->stage_time = 480; // milliseconds
 	this->lines_per_display = 96;
@@ -62,8 +68,8 @@ EPD_Class::EPD_Class(EPD_size size,
 	this->bytes_per_line = 128 / 8;
 	this->bytes_per_scan = 96 / 4;
 	this->filler = false;
-
-
+    
+    
 	// display size dependant items
 	{
 		static uint8_t cs[] = {0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0xff, 0x00};
@@ -73,270 +79,285 @@ EPD_Class::EPD_Class(EPD_size size,
 		this->gate_source = gs;
 		this->gate_source_length = sizeof(gs);
 	}
-
+    
 	// set up size structure
 	switch (size) {
-	default:
-	case EPD_1_44:  // default so no change
+        default:
+        case EPD_1_44:  // default so no change
 		break;
-
-	case EPD_2_0: {
-		this->lines_per_display = 96;
-		this->dots_per_line = 200;
-		this->bytes_per_line = 200 / 8;
-		this->bytes_per_scan = 96 / 4;
-		this->filler = true;
-		static uint8_t cs[] = {0x72, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0xe0, 0x00};
-		static uint8_t gs[] = {0x72, 0x03};
-		this->channel_select = cs;
-		this->channel_select_length = sizeof(cs);
-		this->gate_source = gs;
-		this->gate_source_length = sizeof(gs);
-		break;
+        
+        case EPD_2_0: {
+            this->lines_per_display = 96;
+            this->dots_per_line = 200;
+            this->bytes_per_line = 200 / 8;
+            this->bytes_per_scan = 96 / 4;
+            this->filler = true;
+            static uint8_t cs[] = {0x72, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0xe0, 0x00};
+            static uint8_t gs[] = {0x72, 0x03};
+            this->channel_select = cs;
+            this->channel_select_length = sizeof(cs);
+            this->gate_source = gs;
+            this->gate_source_length = sizeof(gs);
+            break;
+        }
+        
+        case EPD_2_7: {
+            this->stage_time = 630; // milliseconds
+            this->lines_per_display = 176;
+            this->dots_per_line = 264;
+            this->bytes_per_line = 264 / 8;
+            this->bytes_per_scan = 176 / 4;
+            this->filler = true;
+            static uint8_t cs[] = {0x72, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xfe, 0x00, 0x00};
+            static uint8_t gs[] = {0x72, 0x00};
+            this->channel_select = cs;
+            this->channel_select_length = sizeof(cs);
+            this->gate_source = gs;
+            this->gate_source_length = sizeof(gs);
+            break;
+        }
 	}
-
-	case EPD_2_7: {
-		this->stage_time = 630; // milliseconds
-		this->lines_per_display = 176;
-		this->dots_per_line = 264;
-		this->bytes_per_line = 264 / 8;
-		this->bytes_per_scan = 176 / 4;
-		this->filler = true;
-		static uint8_t cs[] = {0x72, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xfe, 0x00, 0x00};
-		static uint8_t gs[] = {0x72, 0x00};
-		this->channel_select = cs;
-		this->channel_select_length = sizeof(cs);
-		this->gate_source = gs;
-		this->gate_source_length = sizeof(gs);
-		break;
-	}
-	}
-
+    
 	this->factored_stage_time = this->stage_time;
 }
 
 
 void EPD_Class::begin() {
-
+    
 	// power up sequence
 	digitalWrite(this->EPD_Pin_RESET, LOW);
 	digitalWrite(this->EPD_Pin_PANEL_ON, LOW);
 	digitalWrite(this->EPD_Pin_DISCHARGE, LOW);
 	digitalWrite(this->EPD_Pin_BORDER, LOW);
 	digitalWrite(this->EPD_Pin_EPD_CS, LOW);
-
+    
+#ifndef _SAM3XA_
 	SPI_on();
-
-	PWM_start(this->EPD_Pin_PWM);
+#endif
+    
+    PWM_start(this->EPD_Pin_PWM);
 	Delay_ms(5);
 	digitalWrite(this->EPD_Pin_PANEL_ON, HIGH);
 	Delay_ms(10);
-
+    
+#ifdef _SAM3XA_
+    SPI_on(this->EPD_Pin_EPD_CS);
+#else
+    digitalWrite(this->EPD_Pin_EPD_CS, HIGH);
+#endif
+    
 	digitalWrite(this->EPD_Pin_RESET, HIGH);
 	digitalWrite(this->EPD_Pin_BORDER, HIGH);
-	digitalWrite(this->EPD_Pin_EPD_CS, HIGH);
 	Delay_ms(5);
-
+    
 	digitalWrite(this->EPD_Pin_RESET, LOW);
 	Delay_ms(5);
-
+    
 	digitalWrite(this->EPD_Pin_RESET, HIGH);
 	Delay_ms(5);
-
+    
 	// wait for COG to become ready
 	while (HIGH == digitalRead(this->EPD_Pin_BUSY)) {
 	}
-
+    
 	// channel select
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x01), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, this->channel_select, this->channel_select_length);
-
+    
 	// DC/DC frequency
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x06), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0xff), 2);
-
+    
 	// high power mode osc
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x07), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x9d), 2);
-
-
+    
+    
 	// disable ADC
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x08), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x00), 2);
-
+    
 	// Vcom level
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x09), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0xd0, 0x00), 3);
-
+    
 	// gate and source voltage levels
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x04), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, this->gate_source, this->gate_source_length);
-
+    
 	Delay_ms(5);  //???
-
+    
 	// driver latch on
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x03), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x01), 2);
-
+    
 	// driver latch off
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x03), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x00), 2);
-
+    
 	Delay_ms(5);
-
+    
 	// charge pump positive voltage on
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x05), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x01), 2);
-
+    
 	// final delay before PWM off
 	Delay_ms(30);
-	PWM_stop(this->EPD_Pin_PWM);
-
+    PWM_stop(this->EPD_Pin_PWM);
+    
 	// charge pump negative voltage on
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x05), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x03), 2);
-
+    
 	Delay_ms(30);
-
+    
 	// Vcom driver on
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x05), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x0f), 2);
-
+    
 	Delay_ms(30);
-
+    
 	// output enable to disable
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x02), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x24), 2);
-
+    
+#ifndef _SAM3XA_
 	SPI_off();
+#endif
 }
 
 
 void EPD_Class::end() {
-
+    
 	// dummy frame
 	this->frame_fixed(0x55, EPD_normal);
-
+    
 	// dummy line and border
 	if (EPD_1_44 == this->size) {
 		// only for 1.44" EPD
 		this->line(0x7fffu, 0, 0xaa, false, EPD_normal);
-
+        
 		Delay_ms(250);
-
+        
 	} else {
 		// all other display sizes
 		this->line(0x7fffu, 0, 0x55, false, EPD_normal);
-
+        
 		Delay_ms(25);
-
+        
 		digitalWrite(this->EPD_Pin_BORDER, LOW);
 		Delay_ms(250);
 		digitalWrite(this->EPD_Pin_BORDER, HIGH);
 	}
-
+    
+#ifndef _SAM3XA_
 	SPI_on();
-
+#endif
+    
 	// latch reset turn on
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x03), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x01), 2);
-
+    
 	// output enable off
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x02), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x05), 2);
-
+    
 	// Vcom power off
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x05), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x0e), 2);
-
+    
 	// power off negative charge pump
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x05), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x02), 2);
-
+    
 	// discharge
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x04), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x0c), 2);
-
+    
 	Delay_ms(120);
-
+    
 	// all charge pumps off
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x05), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x00), 2);
-
+    
 	// turn of osc
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x07), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x0d), 2);
-
+    
 	// discharge internal - 1
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x04), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x50), 2);
-
+    
 	Delay_ms(40);
-
+    
 	// discharge internal - 2
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x04), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0xA0), 2);
-
+    
 	Delay_ms(40);
-
+    
 	// discharge internal - 3
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x04), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x00), 2);
 	Delay_us(10);
-
+    
 	// turn of power and all signals
 	digitalWrite(this->EPD_Pin_RESET, LOW);
 	digitalWrite(this->EPD_Pin_PANEL_ON, LOW);
 	digitalWrite(this->EPD_Pin_BORDER, LOW);
-
+    
 	// ensure SPI MOSI and CLOCK are Low before CS Low
+#ifdef _SAM3XA_
+    SPI_off(this->EPD_Pin_EPD_CS);
+#else
 	SPI_off();
-	digitalWrite(this->EPD_Pin_EPD_CS, LOW);
-
+#endif
+    digitalWrite(this->EPD_Pin_EPD_CS, LOW);
+    
 	// discharge pulse
 	digitalWrite(this->EPD_Pin_DISCHARGE, HIGH);
 	Delay_ms(150);
@@ -469,34 +490,45 @@ void EPD_Class::frame_cb_repeat(uint32_t address, EPD_reader *reader, EPD_stage 
 
 
 void EPD_Class::line(uint16_t line, const uint8_t *data, uint8_t fixed_value, bool read_progmem, EPD_stage stage) {
-
+    
+#ifndef _SAM3XA_
 	SPI_on();
-
+#endif
+    
 	// charge pump voltage levels
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x04), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, this->gate_source, this->gate_source_length);
-
+    
 	// send data
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x0a), 2);
 	Delay_us(10);
-
+    
 	// CS low
+#ifdef _SAM3XA_
+    SPI_put_wait(this->EPD_Pin_EPD_CS, 0x72, this->EPD_Pin_BUSY, true);
+#else
 	digitalWrite(this->EPD_Pin_EPD_CS, LOW);
 	SPI_put_wait(0x72, this->EPD_Pin_BUSY);
-
+#endif
+    
 	// border byte only necessary for 1.44" EPD
 	if (EPD_1_44 == this->size) {
+#ifdef _SAM3XA_
+		SPI_put_wait(this->EPD_Pin_EPD_CS, 0x00, this->EPD_Pin_BUSY, true);
+#else
 		SPI_put_wait(0x00, this->EPD_Pin_BUSY);
+#endif
 		//SPI_send(this->EPD_Pin_EPD_CS, CU8(0x00), 1);
+        
 	}
-
+    
 	// even pixels
 	for (uint16_t b = this->bytes_per_line; b > 0; --b) {
 		if (0 != data) {
-#if defined(__MSP430_CPU__)
+#if defined(__MSP430_CPU__) || defined(_SAM3XA_)
 			uint8_t pixels = data[b - 1] & 0xaa;
 #else
 			// AVR has multiple memory spaces
@@ -508,37 +540,54 @@ void EPD_Class::line(uint16_t line, const uint8_t *data, uint8_t fixed_value, bo
 			}
 #endif
 			switch(stage) {
-			case EPD_compensate:  // B -> W, W -> B (Current Image)
-				pixels = 0xaa | ((pixels ^ 0xaa) >> 1);
-				break;
-			case EPD_white:       // B -> N, W -> W (Current Image)
-				pixels = 0x55 + ((pixels ^ 0xaa) >> 1);
-				break;
-			case EPD_inverse:     // B -> N, W -> B (New Image)
-				pixels = 0x55 | (pixels ^ 0xaa);
-				break;
-			case EPD_normal:       // B -> B, W -> W (New Image)
-				pixels = 0xaa | (pixels >> 1);
-				break;
+                case EPD_compensate:  // B -> W, W -> B (Current Image)
+                pixels = 0xaa | ((pixels ^ 0xaa) >> 1);
+                break;
+                case EPD_white:       // B -> N, W -> W (Current Image)
+                pixels = 0x55 + ((pixels ^ 0xaa) >> 1);
+                break;
+                case EPD_inverse:     // B -> N, W -> B (New Image)
+                pixels = 0x55 | (pixels ^ 0xaa);
+                break;
+                case EPD_normal:       // B -> B, W -> W (New Image)
+                pixels = 0xaa | (pixels >> 1);
+                break;
 			}
+#ifdef _SAM3XA_
+            SPI_put_wait(this->EPD_Pin_EPD_CS, pixels, this->EPD_Pin_BUSY, true);
+#else
 			SPI_put_wait(pixels, this->EPD_Pin_BUSY);
-		} else {
+#endif
+        } else {
+#ifdef _SAM3XA_
+            SPI_put_wait(this->EPD_Pin_EPD_CS, fixed_value, this->EPD_Pin_BUSY, true);
+#else
 			SPI_put_wait(fixed_value, this->EPD_Pin_BUSY);
-		}	}
-
+#endif
+		}
+    }
+    
 	// scan line
 	for (uint16_t b = 0; b < this->bytes_per_scan; ++b) {
 		if (line / 4 == b) {
+#ifdef _SAM3XA_
+            SPI_put_wait(this->EPD_Pin_EPD_CS, 0xc0 >> (2 * (line & 0x03)), this->EPD_Pin_BUSY, true);
+#else
 			SPI_put_wait(0xc0 >> (2 * (line & 0x03)), this->EPD_Pin_BUSY);
+#endif
 		} else {
-			SPI_put_wait(0x00, this->EPD_Pin_BUSY);
+#ifdef _SAM3XA_
+            SPI_put_wait(this->EPD_Pin_EPD_CS, 0x00, this->EPD_Pin_BUSY, true);
+#else
+            SPI_put_wait(0x00, this->EPD_Pin_BUSY);
+#endif
 		}
 	}
-
+    
 	// odd pixels
 	for (uint16_t b = 0; b < this->bytes_per_line; ++b) {
 		if (0 != data) {
-#if defined(__MSP430_CPU__)
+#if defined(__MSP430_CPU__) || defined(_SAM3XA_)
 			uint8_t pixels = data[b] & 0x55;
 #else
 			// AVR has multiple memory spaces
@@ -550,16 +599,16 @@ void EPD_Class::line(uint16_t line, const uint8_t *data, uint8_t fixed_value, bo
 			}
 #endif
 			switch(stage) {
-			case EPD_compensate:  // B -> W, W -> B (Current Image)
+                case EPD_compensate:  // B -> W, W -> B (Current Image)
 				pixels = 0xaa | (pixels ^ 0x55);
 				break;
-			case EPD_white:       // B -> N, W -> W (Current Image)
+                case EPD_white:       // B -> N, W -> W (Current Image)
 				pixels = 0x55 + (pixels ^ 0x55);
 				break;
-			case EPD_inverse:     // B -> N, W -> B (New Image)
+                case EPD_inverse:     // B -> N, W -> B (New Image)
 				pixels = 0x55 | ((pixels ^ 0x55) << 1);
 				break;
-			case EPD_normal:       // B -> B, W -> W (New Image)
+                case EPD_normal:       // B -> B, W -> W (New Image)
 				pixels = 0xaa | pixels;
 				break;
 			}
@@ -568,41 +617,81 @@ void EPD_Class::line(uint16_t line, const uint8_t *data, uint8_t fixed_value, bo
 			uint8_t p3 = (pixels >> 2) & 0x03;
 			uint8_t p4 = (pixels >> 0) & 0x03;
 			pixels = (p1 << 0) | (p2 << 2) | (p3 << 4) | (p4 << 6);
+            
+#ifdef _SAM3XA_
+            SPI_put_wait(this->EPD_Pin_EPD_CS, pixels, this->EPD_Pin_BUSY, true);
+#else
 			SPI_put_wait(pixels, this->EPD_Pin_BUSY);
-		} else {
+#endif
+        } else {
+#ifdef _SAM3XA_
+            SPI_put_wait(this->EPD_Pin_EPD_CS, fixed_value, this->EPD_Pin_BUSY, true);
+#else
 			SPI_put_wait(fixed_value, this->EPD_Pin_BUSY);
-		}
+#endif
+        }
 	}
-
+    
 	if (this->filler) {
-		SPI_put_wait(0x00, this->EPD_Pin_BUSY);
+#ifdef _SAM3XA_
+        SPI_put_wait(this->EPD_Pin_EPD_CS, 0x00, this->EPD_Pin_BUSY, false);
+#else
+        SPI_put_wait(0x00, this->EPD_Pin_BUSY);
+#endif
 	}
-
+    
 	// CS high
+#ifndef _SAM3XA_
 	digitalWrite(this->EPD_Pin_EPD_CS, HIGH);
-
+#endif
 	// output data to panel
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x70, 0x02), 2);
 	Delay_us(10);
 	SPI_send(this->EPD_Pin_EPD_CS, CU8(0x72, 0x2f), 2);
-
+    
+#ifndef _SAM3XA_
 	SPI_off();
+#endif
 }
 
-
+#ifdef _SAM3XA_
+static void SPI_on(uint8_t cs_pin) {
+    //SPI.end(cs_pin);
+    SPI.begin(cs_pin);
+    SPI.setBitOrder(cs_pin, MSBFIRST);
+    SPI.setDataMode(cs_pin, SPI_MODE0);
+    SPI.setClockDivider(cs_pin, 7);  // 12MHz
+    //  SPI_put(cs_pin, 0x00, true);
+    //  SPI_put(cs_pin, 0x00, false);
+    Delay_us(10);
+    
+}
+#else
 static void SPI_on() {
 	SPI.end();
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE2);
-	SPI.setClockDivider(SPI_CLOCK_DIV2);
+    SPI.setClockDivider(SPI_CLOCK_DIV2);
 	SPI_put(0x00);
 	SPI_put(0x00);
 	Delay_us(10);
 }
+#endif
 
-
+#ifdef _SAM3XA_
+static void SPI_off(uint8_t cs_pin) {
+    // SPI.begin();
+    // SPI.setBitOrder(MSBFIRST);
+    SPI.setDataMode(cs_pin, SPI_MODE0);
+    //SPI.setClockDivider(SPI_CLOCK_DIV2);
+    SPI_put(cs_pin, 0x00, true);
+    SPI_put(cs_pin, 0x00, false);
+    Delay_us(10);
+    SPI.end(cs_pin);
+}
+#else
 static void SPI_off() {
 	// SPI.begin();
 	// SPI.setBitOrder(MSBFIRST);
@@ -613,34 +702,69 @@ static void SPI_off() {
 	Delay_us(10);
 	SPI.end();
 }
+#endif
 
-
+#ifdef _SAM3XA_
+static void SPI_put(uint8_t cs_pin, uint8_t c, uint8_t contin) {
+    if (contin) {
+        SPI.transfer(cs_pin, c, SPI_CONTINUE);
+    } else {
+        SPI.transfer(cs_pin, c);
+    }
+}
+#else
 static void SPI_put(uint8_t c) {
 	SPI.transfer(c);
 }
+#endif
 
-
+#ifdef _SAM3XA_
+static void SPI_put_wait(uint8_t cs_pin, uint8_t c, int busy_pin, uint8_t contin) {
+    
+    if (contin) {
+        SPI.transfer(cs_pin, c, SPI_CONTINUE);
+    } else {
+        SPI.transfer(cs_pin, c);
+    }
+    
+    // wait for COG ready
+    while (HIGH == digitalRead(busy_pin)) {
+    }
+}
+#else
 static void SPI_put_wait(uint8_t c, int busy_pin) {
-
+    
 	SPI_put(c);
-
+    
 	// wait for COG ready
 	while (HIGH == digitalRead(busy_pin)) {
 	}
 }
+#endif
 
 
 static void SPI_send(uint8_t cs_pin, const uint8_t *buffer, uint16_t length) {
+#ifdef _SAM3XA_
+	// send all data
+	for (uint16_t i = 0; i < length; ++i) {
+        if (i == length-1)
+        SPI_put(cs_pin, *buffer++, false);
+        else
+        SPI_put(cs_pin, *buffer++, true);
+	}
+#else
 	// CS low
 	digitalWrite(cs_pin, LOW);
-
+    
 	// send all data
 	for (uint16_t i = 0; i < length; ++i) {
 		SPI_put(*buffer++);
 	}
-
+    
 	// CS high
 	digitalWrite(cs_pin, HIGH);
+    
+#endif
 }
 
 
