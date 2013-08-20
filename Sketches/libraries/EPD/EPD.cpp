@@ -658,6 +658,8 @@ void EPD_Class::line(uint16_t line, const uint8_t *data, uint8_t fixed_value, bo
 #ifdef _SAM3XA_
 static void SPI_on(uint8_t cs_pin) {
     //SPI.end(cs_pin);
+    // set cs_pin to input before the SPI grabs it
+    digitalWrite(cs_pin, INPUT);
     SPI.begin(cs_pin);
     SPI.setBitOrder(cs_pin, MSBFIRST);
     SPI.setDataMode(cs_pin, SPI_MODE0);
@@ -684,12 +686,14 @@ static void SPI_on() {
 static void SPI_off(uint8_t cs_pin) {
     // SPI.begin();
     // SPI.setBitOrder(MSBFIRST);
-    SPI.setDataMode(cs_pin, SPI_MODE0);
+    //SPI.setDataMode(cs_pin, SPI_MODE0);
     //SPI.setClockDivider(SPI_CLOCK_DIV2);
-    SPI_put(cs_pin, 0x00, true);
-    SPI_put(cs_pin, 0x00, false);
+    //SPI_put(cs_pin, 0x00, true);
+    //SPI_put(cs_pin, 0x00, false);
     Delay_us(10);
     SPI.end(cs_pin);
+    // set the cs_pin back to output so code can set it LOW)
+    digtialWrite(cs_pin, OUTPUT);
 }
 #else
 static void SPI_off() {
